@@ -1,58 +1,56 @@
-from common import *
-import credentials
-from tokenize import group
-from telethon.sync import TelegramClient
-from telethon.tl.functions.messages import GetDialogsRequest
-from telethon.tl.types import InputPeerEmpty
-import os
-import sys
+from common import store_to_json
+from scraping_courses_link import get_courses_links, open_links
+from setup import is_config_need, has_unknown_ags, unknown_arg, run_config, is_install_need, run_install
+from telegram import just_url_formatter
+from telegram_view import TelegramView
 
-try:
-    credential = credentials.load_credentials()
-    api_id = credential['id']
-    api_hash = credential['hash']
-    phone = credential['phone']
-    client = TelegramClient(phone, api_id, api_hash)
-    client.connect()
-except KeyError:
-    os.system('clear')
 
-    print(emphasis_format('[!]') + 'run python3 setup.py first !!\n')
-    sys.exit(1)
+if __name__ == '__main__':
+    if has_unknown_ags():
+        unknown_arg()
 
-if not client.is_user_authorized():
-    client.send_code_request(phone)
-    os.system('clear')
+    if is_conf := is_config_need():
+        run_config()
 
-    client.sign_in(phone, input(plus_simbol_text('Enter the code: ') + RE))
+    if is_install_need() or is_conf:
+        run_install()
+    telegram = TelegramView()
 
-os.system('clear')
+    telegram.chats()
+    telegram.filter_chats()
+    telegram.select_chat()
+    messages = telegram.messages()
+    print("End getting the links from telegram page!!")
+    print(len(messages))
+    formatted_messages = just_url_formatter(messages)
 
-chats = []
-last_date = None
-chunk_size = 200
-groups = []
-result = client(GetDialogsRequest(
-    offset_date=last_date,
-    offset_id=0,
-    offset_peer=InputPeerEmpty(),
-    limit=chunk_size,
-    hash=0
-))
-chats.extend(result.chats)
+    print(len(formatted_messages))
+    print("")
+    print("Start saving to json file")
+    store_to_json('messages', formatted_messages)
+    print("End to save the json file")
 
-for chat in chats:
-    try:
-        if chat.megagroup == True:
-            groups.append(chat)
-    except:
-        continue
+    print("")
+    print("Star getting the real links: ")
+    links = [message['url'] for message in formatted_messages]
+    print(len(links))
 
-print(plus_simbol_text('Choose a group to scrape members :') + RE)
 
-for i, group in enumerate(groups):
-    print(emphasis_format(i) + ' - ' + group.title)
+    courses_links, errors = get_courses_links(links)
+    print("End getting the real courses links!!")
 
-print('')
-g_index = input(plus_simbol_text('[+] Enter a Number : ') + RE)
-target_group = groups[int(g_index)]
+    print("")
+    print("Start saving to json file")
+    store_to_json('courses_links', courses_links)
+    print("End to save the json file")
+
+    if errors:
+        print("")
+        print("Start saving errors to json file")
+        store_to_json('error_links', errors)
+        print("End to save errors json file")
+
+    print("")
+    print("Starting opening urls on browser")
+    open_links(courses_links)
+    print("End to save the json file")
