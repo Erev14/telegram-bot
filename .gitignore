@@ -1,7 +1,5 @@
-/add2group.py
 /config.ini
-/scraper.py
-/smsbot.py
 .idea
 __pycache__
 *.session
+/export/*
